@@ -55,6 +55,8 @@ public:
 
     std::unordered_set<Node> occupied;
 
+    void debugger(int index);
+
     int num_robots;
     
 

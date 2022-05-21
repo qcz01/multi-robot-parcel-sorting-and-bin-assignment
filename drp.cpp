@@ -132,11 +132,12 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
         // auto next_step = std::vector<Node>(task.num_robots);
         next_step.clear();
         current_positions.clear();
+        moved_robots.clear();
         // std::unordered_set<Node> current_vertices;
         for (size_t i = 0; i < task.num_robots; i++){
             // next_step[i] = future_paths[i].back();
 
-            assert(future_paths[i].size()!=0);
+            // assert(future_paths[i].size()!=0);
             next_step.push_back(future_paths[i].back());
             // current_vertices.insert(paths.back()[i]);
             current_positions.insert({paths.back()[i],i});
@@ -154,170 +155,148 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
         //     std::cout<<v<<"  "<<id<<std::endl;
         // }
         // exit(0);
-        std::unordered_set<int> moved;
+   
         recStack.clear();
-        occupied.clear();
+        cycling.clear();
         paths.push_back(paths.back());
         // for(int i=0;i<task.num_robots;i++){
         //     std::cout<<" robot "<<i<<" current step ="<<paths.back()[i]<<" next step "<<next_step[i]<<std::endl;
+        // if(paths.size()==2){
+        //     std::cout<<paths.back()[12]<<"  "<<future_paths[12].back()<<std::endl;
+        //     std::cout<<paths.back()[19]<<"  "<<future_paths[19].back()<<std::endl;
+        //     std::cout<<paths.back()[4]<<"  "<<future_paths[4].back()<<std::endl;
+        //     std::cout<<paths.back()[3]<<"  "<<future_paths[3].back()<<std::endl;
+        //     std::cout<<paths.back()[2]<<"  "<<future_paths[2].back()<<std::endl;
+        //     std::cout<<paths.back()[1]<<"  "<<future_paths[1].back()<<std::endl;
+        //     // exit(0);
         // }
+        // }
+
         for(int i=0;i<task.num_robots;i++){
             // if(i==88 ) std::cout<<" robot "<<i<<" current step ="<<paths.back()[i]<<" next step "<<next_step[i]<<"  future paths[i].size()="<<future_paths[i].size()<<"  goal_id= "<<goal_ids[i]<<std::endl;
    
-         
-            move(i,moved,paths);
+            recStack.clear();
+            move(i,paths);
         }
     }
        
 }
 
-bool DRP::move(int robot,std::unordered_set<int> &moved,std::vector<std::vector<Node>>& paths){
+void DRP::move_all_robots_in_cycle(int robot,Paths&paths){
+    std::set<int> visited;
+    auto curr=robot;
+    std::cout<<"Move along a cycle"<<std::endl;
+    bool debbuged=false;
+    if(paths.size()==2) debbuged=true;
+    while(true){
+  
+        if(visited.find(curr)!=visited.end()) break;
+        visited.insert(curr);
+        auto v=future_paths[curr].back();
+        if(debbuged)std::cout<<"oh cycled "<<curr<<" " <<v <<std::endl;
+        moveRobot(curr,paths);
+        cycling[curr]=true;
+        curr=current_positions[v];
+    }
+
+}
+
+
+int DRP::get_conflicted_robot(int r,Paths &paths){
+    auto ur=paths.back()[r];
+    auto vr=future_paths[r].back();
+    for(int x=ur.x-1;x<=ur.x+1;x++){
+        for(int y=ur.y-1;y<=ur.y+1;y++){
+            Node nb=Node(x,y);
+            if(nb==ur) continue;
+            if(current_positions.find(nb)==current_positions.end()) continue;
+            auto rk=current_positions[nb];
+            if(moved_robots.find(rk)!=moved_robots.end() and paths.back()[rk]==vr)return rk;
+            auto vk=future_paths[rk].back();
+            if(vk==vr) return rk;
+
+        }
+    }
+    return -1;
+}
+
+std::pair<bool,bool> DRP::move(int robot,Paths& paths){
+     bool debugged=false;
+    if(paths.size()==2) debugged=true;
+    if(robot<0) return {true,true};
     auto next_v=next_step[robot];
-    if(moved.find(robot)!=moved.end())return true;//aleady moved
+    if(moved_robots.find(robot)!=moved_robots.end())return {moved_robots[robot],cycling[robot]};  //aleady moved
     if(next_v==Node(-1,-1)){
         paths.back()[robot]=next_v;
+        future_paths[robot].pop_back();
+        // assert(future_paths[robot].size()<=100);
+        return {true,false};
+    }
+    if(recStack.find(robot)!=recStack.end()){
+        // if(paths.size()==112) {
+        //     std::cout<<"find cycles "<<robot<<std::endl;
+        //     exit(0);
+        // }
    
-        future_paths[robot].pop_back();
-        
-    
-        // assert(future_paths[robot].size()<=100);
-        return true;
+        move_all_robots_in_cycle(robot,paths);
+        return {true,true};
     }
-    if(next_v==paths.back()[robot]){
-        paths.back()[robot]=next_v;
-        
-        future_paths[robot].pop_back();
-        occupied.insert(next_v);
-        // if(robot==88) std::cout<<"debugged  "<<future_paths[robot].size()<<std::endl;
-        // assert(future_paths[robot].size()<=100);
-        moved.insert(robot);
-        return true;
+    recStack.insert(robot);
+    int robot_j;
+    if(current_positions.find(next_v)==current_positions.end())robot_j=-1;
+    else robot_j=current_positions[next_v];
+    // if(robot==2 and debugged==true) std::cout<<"rj="<<robot_j<<std::endl;
+    auto flag=move(robot_j,paths);
+    if(moved_robots.find(robot)!=moved_robots.end()){
+        if(debugged and robot==12){
+            std::cout<<"moved in this cycle  "<<paths.back()[12]<<std::endl;
+          
+        }
+        return {moved_robots[robot],cycling[robot]};
+    }
+    
+    if(flag.first==false){
+        delayRobot(robot,paths);
+        return {false,false};
+    }
+       
+    
+  
+    int rk=get_conflicted_robot(robot,paths);
+
+    if(rk==12 and debugged==true) std::cout<<"conflicted "<<rk<<"  "<<robot<<std::endl;
+
+    if(rk==-1){
+        moveRobot(robot,paths);
+        return {true,false};
+    }
+
+    if(future_paths[rk].size()>future_paths[robot].size() or cycling.find(rk)!=cycling.end()){
+        if(cycling.find(rk)==cycling.end())
+            moveRobot(rk,paths);
+        delayRobot(robot,paths);
+        return {false,false};
+    }else{
+        delayRobot(rk,paths);
+        moveRobot(robot,paths);
+        return {true,false};
     }
 
     
-    if(current_positions.find(next_v)==current_positions.end()){    //next v is not occupied by other robots
-        for(int j=robot+1;j<num_robots;j++){
-            auto next_vj=next_step[j];
-            if(next_v==next_vj){
-                if(moved.find(j)!=moved.end() or occupied.find(next_v)!=occupied.end()){
-                    moved.insert(robot);
-                    assert(occupied.find(paths.back()[robot])==occupied.end());
-                    occupied.insert(paths.back()[robot]);
-               
-                    return false;
-                }
-                if(future_paths[robot].size()<future_paths[j].size()){
-                    paths.back()[robot]=future_paths[robot].back();
-                    
-                    future_paths[robot].pop_back();
-                    // if(robot==88) std::cout<<"debuged  "<<future_paths[robot].size()<<std::endl;
-                    assert(occupied.find(paths.back()[robot])==occupied.end());
-                    occupied.insert(future_paths[robot].back());
-                    assert(occupied.find(paths.back()[j])==occupied.end());
-                    occupied.insert(paths.back()[j]);
-                    moved.insert(robot);
-                    moved.insert(j);
-                    return true;
-                }
-                else{
-                    paths.back()[j]=future_paths[j].back();
-                    // if(j==88) std::cout<<"debug  "<<future_paths[j].size()<<std::endl;
-                    future_paths[j].pop_back();
-                    // if(j==88) std::cout<<"debugged  "<<future_paths[j].size()<<std::endl;
-                    assert(occupied.find(paths.back()[j])==occupied.end());
-                    occupied.insert(future_paths[j].back());
-                    assert(occupied.find(paths.back()[robot])==occupied.end());
-                    occupied.insert(paths.back()[robot]);
-                    moved.insert(robot);
-                    moved.insert(j);
-                    // std::cout<<"Robot "<<robot<<" delayed"<<std::endl;
-                    return false;
-                }
-            }
-        }
-        if(occupied.find(future_paths[robot].back())==occupied.end()){
-            paths.back()[robot]=future_paths[robot].back();
-            assert(occupied.find(paths.back()[robot])==occupied.end());
-            occupied.insert(future_paths[robot].back());
-            future_paths[robot].pop_back();
-            moved.insert(robot);
-            return true;
-        }
-        else{
-             assert(occupied.find(paths.back()[robot])==occupied.end());
-            occupied.insert(paths.back()[robot]);
-           
-            moved.insert(robot);
-            return false;
-        }
-      
-        
-     
-                    
-        
-    }else{      //recursively ask its front robot
-        recStack.insert(robot);
-        auto next_robot=current_positions[next_v];
-        if(recStack.find(next_robot)!=recStack.end())//a cycle is found
-        {
-            paths.back()[robot]=future_paths[robot].back();
-            moved.insert(robot);
-            occupied.insert(paths.back()[robot]);
-            return true;
-        }
-        bool flag=move(next_robot,moved,paths);
-        if(flag==false or occupied.find(next_v)!=occupied.end()){
-            // std::cout<<"Robot "<<robot<<" delayed"<<std::endl;
-            //delay this robot
-            moved.insert(robot);
-            occupied.insert(paths.back()[robot]);
-            return false;
 
-        }else{
-            for (int j = robot + 1; j < num_robots; j++)
-            {
-                auto next_vj = next_step[j];
-                if (next_v == next_vj)
-                {
-                    if(moved.find(j)!=moved.end() or occupied.find(next_v)!=occupied.end()){
-                        moved.insert(robot);
-                        occupied.insert(paths.back()[robot]);
-                        return false;
-                    }
-                    if (future_paths[robot].size() < future_paths[j].size())
-                    {
-                        paths.back()[robot] = future_paths[robot].back();
-                        occupied.insert(future_paths[robot].back());
-                        future_paths[robot].pop_back();
-                      
-                        occupied.insert(paths.back()[j]);
-                        moved.insert(robot);
-                        moved.insert(j);
-                        return true;
-                    }
-                    else
-                    {
-                        // std::cout<<"Robot "<<robot<<" delayed"<<std::endl;
-                        occupied.insert(future_paths[j].back());
-                        paths.back()[j] = future_paths[j].back();
-                        future_paths[j].pop_back();
-                    
-                        occupied.insert(paths.back()[robot]);
-                        moved.insert(robot);
-                        moved.insert(j);
-                        return false;
-                    }
-                }
-            }
-            assert(future_paths[robot].empty()==false);
-            paths.back()[robot]=future_paths[robot].back();
-            occupied.insert(future_paths[robot].back());
-            future_paths[robot].pop_back();
-            moved.insert(robot);
-            
-            return true;
-        }
-    }
+    
+}
+
+void DRP::moveRobot(int i,Paths &paths){
+    moved_robots[i]=true;
+    assert(future_paths[i].empty()==false);
+    paths.back()[i]=future_paths[i].back();
+    future_paths[i].pop_back();
+}
+
+void DRP::delayRobot(int i, Paths &paths){
+    moved_robots[i]=false;
+    paths.back()[i]=paths.back()[i];
 }
 
 

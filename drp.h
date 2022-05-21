@@ -30,22 +30,21 @@
 class DRP{
 public:
     DRP(){};
-
+    using Paths=std::vector<std::vector<Node>>;
     std::vector<std::vector<Node>> solve(MultiGoalTask& t, Graph& g,int horizon = std::numeric_limits<int>::max());
 
-
-    bool move(int robot_id,std::unordered_set<int> &moved,std::vector<std::vector<Node>>&);        //recursively move robots
-
-    std::unordered_map<Node,int> current_positions;
     
-    std::vector<std::pair<int,int>> vertex_conflicts;
+    std::pair<bool,bool> move(int robot_id,Paths&);        //recursively move robots
+
+   
+    
 
     std::map<int,int> priority;
 
     bool check_cycles(const std::vector<Node> &next_pos);
 
-    std::unordered_map<int,bool> moved_robots;
-    std::set<int> recStack;
+    
+    
 
     std::vector<Node> next_step;
 
@@ -53,9 +52,24 @@ public:
 
     std::vector<std::vector<Node>> future_paths;
 
-    std::unordered_set<Node> occupied;
+    std::map<int,bool> cycling;
+    std::unordered_map<Node,int> current_positions;
+    std::set<int> recStack;
+    std::map<int,bool> moved_robots;
+
 
     void debugger(int index);
+
+
+    void delayRobot(int robot,Paths &paths);
+
+    void moveRobot(int robot,Paths &paths);
+
+    void move_all_robots_in_cycle(int robot,Paths &paths);
+
+    int get_conflicted_robot(int robot,Paths &paths);
+
+
 
     int num_robots;
     

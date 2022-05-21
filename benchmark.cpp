@@ -7,7 +7,7 @@ std::pair<std::string,std::vector<std::pair<int, std::pair<MultiGoalTask, Graph>
     Graph graph = get_sorting_warehouse();
     std::cout<<"Sorting graph read! "<<graph.x_size<<" x "<<graph.y_size<<" "<<graph.nodes.size()<<std::endl;
   
-    for (size_t i = 20; i <= 20; i += 10) {
+    for (size_t i = 10; i <= 100; i += 10) {
         tgs.push_back(std::make_pair(
             i, std::make_pair(
                    get_multi_goal_task(i, 100000 * 2 / i, 100000, graph, 100),

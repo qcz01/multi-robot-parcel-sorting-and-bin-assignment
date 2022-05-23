@@ -338,13 +338,21 @@ inline Graph get_warehouse_graph(int num_shelf_x, int num_shelf_y,
     return g;
 }
 
+
+/**
+ * @brief Get the sorting warehouse object
+ * 
+ * @param xmax 
+ * @param ymax 
+ * @return Graph 
+ */
 inline Graph get_sorting_warehouse(int xmax=27,int ymax=12){
     Graph g=Graph();
     // sorting center warehouse directed graph
     assert(xmax > 0 && ymax > 0);
         // Initialize data structures
     g.nodes = std::vector<Node>();
-    g.nodes.reserve(xmax*ymax);
+    g.nodes.reserve((xmax+2)*(ymax+2));
     g.adj_list =std::unordered_map<Node, std::vector<Node>, std::hash<Node>>();
     g.blocked = std::vector<std::vector<bool>>(xmax, std::vector<bool>(ymax, false));
     g.obstacles = std::vector<Node>();
@@ -358,9 +366,9 @@ inline Graph get_sorting_warehouse(int xmax=27,int ymax=12){
             // Find all neighbors
             auto neighbors = std::vector<Node>();
             if(j %3==0 and i<xmax-1) neighbors.push_back(Node(i+1,j));
-            if(j %3==2 and i>0) neighbors.push_back(Node(i-1,j));
+            if(j %3==1 and i>0) neighbors.push_back(Node(i-1,j));
             if(i %3==0 and j>0) neighbors.push_back(Node(i,j-1));
-            if(i %3==2 and j <ymax-1) neighbors.push_back(Node(i,j+1));
+            if(i %3==1 and j <ymax-1) neighbors.push_back(Node(i,j+1));
             g.adj_list.insert(std::make_pair(n, neighbors));
         }
     }
@@ -379,6 +387,31 @@ inline Graph get_sorting_warehouse(int xmax=27,int ymax=12){
         std::cout<<")"<<std::endl;
     }
    
+    return g;
+    //
+}
+
+/**
+ * @brief Get the sorting warehouse undirected object
+ * 
+ * @param xmax 
+ * @param ymax 
+ * @return Graph 
+ */
+inline Graph get_sorting_warehouse_undirected(int xmax=27,int ymax=12){
+
+    // sorting center warehouse directed graph
+    assert(xmax > 0 && ymax > 0);
+        // Initialize data structures
+
+    // Generate nodes
+    Graph g = Graph(xmax+2, ymax+2);
+    auto obstacles = std::vector<Node>();
+    for (size_t i= 2; i<xmax; i+=3)
+        for (size_t j=2; j < ymax; j+=3) {
+            obstacles.push_back(Node(i, j));
+        }
+    for (auto n : obstacles) g.remove_node(n);
     return g;
     //
 }

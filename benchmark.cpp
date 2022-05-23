@@ -1,6 +1,22 @@
+
+/**
+ * @file benchmark.cpp
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2022-05-21
+ * 
+ * @copyright Copyright (c) 2022
+ * 
+ */
 #include"benchmark.h"
 #include"drp.h"
+#include <random>
 
+/**
+ * @brief Construct a new std::pair<std::string,std::vector<std::pair<int, std::pair<MultiGoalTask, Graph>>>>get warehouse multi goal tasks small object
+ * 
+ */
 std::pair<std::string,std::vector<std::pair<int, std::pair<MultiGoalTask, Graph>>>>get_warehouse_multi_goal_tasks_small() {
     std::string name = "warehouse";
     std::vector<std::pair<int, std::pair<MultiGoalTask, Graph>>> tgs;
@@ -17,6 +33,10 @@ std::pair<std::string,std::vector<std::pair<int, std::pair<MultiGoalTask, Graph>
     return std::make_pair(name, tgs);
 }
 
+/**
+ * @brief 
+ * 
+ */
 void test_multi_goal_drp() {
   
     auto tfs = std::vector<MultiTaskFunction>(
@@ -30,7 +50,15 @@ void test_multi_goal_drp() {
     }
 }
 
+
+
 std::string result_path = "results/test";
+/**
+ * @brief 
+ * 
+ * @param tf 
+ * @param horizon 
+ */
 void multi_goal_test_helper_drp(MultiTaskFunction tf, int horizon){
     std::experimental::filesystem::create_directory(result_path);
     size_t drp_horizon=300;
@@ -133,4 +161,80 @@ void multi_goal_test_helper_drp(MultiTaskFunction tf, int horizon){
     // for (size_t s = 0; s < solvers.size(); s++) {
     //     delete solvers[s].first.suo;
     // }                                       
+}
+
+
+/**
+ * @brief Get the multi goal task object
+ * 
+ * @param station_positions 
+ * @param probability 
+ * @param num_robots 
+ * @param num_goals_per_robot 
+ * @param target_goal_reaching_num 
+ * @param g 
+ * @param seed 
+ * @return MultiGoalTask 
+ */
+MultiGoalTask get_multi_goal_task_(std::vector<Node> &station_positions,std::vector<std::vector<double>>&probability,std::map<int,std::vector<Node>>&type_bin,int num_robots,int num_goals_per_robot,int target_goal_reaching_num, Graph& g){
+    std::random_device r;
+    std::default_random_engine e1(r());
+    size_t num_stations=probability.size();
+    std::random_device rd; // obtain a random number from hardware
+    std::mt19937 gen(rd()); // seed the generator
+    std::uniform_int_distribution<> s_gen(0, num_stations); // define the range
+    std::vector<std::discrete_distribution<int>> random_gen;
+
+
+    for(int k=0;k<num_stations;k++){
+        random_gen.push_back(std::discrete_distribution<int>(probability[k].begin(),probability[k].end()));
+    }
+    MultiGoalTask t;
+    t.num_robots=num_robots;
+    t.starts=get_random_nodes(g,num_robots,false,rand());
+    t.goals=std::vector<std::vector<Node>>();
+    t.target_goal_reaching_num=target_goal_reaching_num;
+    for(size_t i=0;i<num_robots;i++){
+        int k=0;
+        while(k<num_goals_per_robot){
+            int station=s_gen(gen);
+            int type=random_gen[station](gen);
+            t.goals[i].push_back(station_positions[station]);
+            t.goals[i].push_back(get_closest_bin(station_positions,type_bin,station,type));
+            k+=2;
+        }
+    }
+    return t;
+}
+
+
+
+/**
+ * @brief Get the closest bin object
+ * 
+ * @param station_position 
+ * @param bin_map 
+ * @param station 
+ * @param type 
+ * @return Node 
+ */
+Node get_closest_bin(std::vector<Node> &station_position,std::map<int,std::vector<Node>> &bin_map,int station,int type){
+    int min_dist=100000;
+    Node u;
+    for(int i=0;i<bin_map[type].size();i++){
+        auto bin=bin_map[type][i];
+        std::vector<Node> possible_destinations;
+        possible_destinations.push_back(Node(bin.x+1,bin.y));
+        possible_destinations.push_back(Node(bin.x-1,bin.y));
+        possible_destinations.push_back(Node(bin.x,bin.y+1));
+        possible_destinations.push_back(Node(bin.x,bin.y-1));
+        for(auto &nbr:possible_destinations){
+            auto dist=get_manhattan_distance(nbr,station_position[station]);
+            if(dist<min_dist){
+                min_dist=dist;
+                u=nbr;
+            }
+        }
+    }
+    return u;
 }

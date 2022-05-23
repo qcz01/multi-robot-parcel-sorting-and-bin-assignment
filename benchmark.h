@@ -26,3 +26,11 @@ typedef std::pair<
     *MultiTaskFunction)(void);
 
 void multi_goal_test_helper_drp(MultiTaskFunction tf, int horizon);
+
+
+MultiGoalTask get_multi_goal_task_(std::vector<Node> &station_positions,std::vector<std::vector<double>>&probability, std::map<int,std::vector<Node>>&type_bin,int num_robots,int num_goals_per_robot,int target_goal_reaching_num, Graph& g);
+
+
+Node get_closest_bin(std::vector<Node> &station_position,std::map<int,std::vector<Node>> &bin_map,int station,int type);
+
+void read_settings_from_txt(std::string file_name,std::map<int,std::vector<Node>>&type_bin,std::vector<Node>&station_positions);

@@ -1,13 +1,15 @@
 /**
- * @file drp.h
+ * @file edrp.h
  * @author your name (you@domain.com)
  * @brief 
  * @version 0.1
- * @date 2022-05-03
+ * @date 2022-06-05
  * 
  * @copyright Copyright (c) 2022
  * 
  */
+
+
 
 #pragma once
 
@@ -27,9 +29,9 @@
 
 
 
-class DRP{
+class EDRP{
 public:
-    DRP(){};
+    EDRP(){};
     using Paths=std::vector<std::vector<Node>>;
     std::vector<std::vector<Node>> solve(MultiGoalTask& t, Graph& g,int horizon = std::numeric_limits<int>::max());
 
@@ -72,8 +74,5 @@ public:
 
 
     int num_robots;
-    
-
-
 
 };

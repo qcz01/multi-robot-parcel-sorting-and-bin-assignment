@@ -794,7 +794,7 @@ class ECBSSolver {
 
     SUO* suo = nullptr;  // Place for the SUO heuristic
     bool use_suo = false;
-    int default_horizon = 5;
+    int default_horizon =5;
     bool adaptive_horizon = false;
     double learning_rate = 0.25;
     double exploration_rate = 0.5;

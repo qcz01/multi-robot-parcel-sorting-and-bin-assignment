@@ -4,31 +4,36 @@ from common import *
 from settings import *
 
 
-
-
-def min_cost_matching(prob):
+cdef min_cost_matching(list prob):
     """_summary_
     
     calculate the min-cost matching
     """
+    cdef int c,b,wbc,k
+    cdef list cost_bins
+    cdef double final_cost
+    cdef list cost
+    cost=np.zeros([types,num_bins]).tolist()
     
-    cost=np.zeros([types,num_bins])
     for c in range(types):
         for b in range(num_bins):
             wbc=0
             for k in range(num_station):
                 wbc=wbc+prob[k][c]*distance(bin_positions[b],station_position[k])
             cost[c][b]=wbc
-  # print(cost)
+
     row_ind,col_ind=linear_sum_assignment(cost)
-    final_cost=cost[row_ind, col_ind].sum()
+    final_cost=0
+    for r,c in zip(row_ind,col_ind):
+        final_cost=final_cost+cost[r][c]
+   # final_cost=cost[row_ind, col_ind].sum()
     cost_bins=[cost[c][b] for c,b in zip(row_ind,col_ind)]
     return row_ind,col_ind,cost_bins,final_cost
 
 
 
 
-def evaluateCost(bins,c,prob):
+cpdef evaluateCost(list bins,int c,list prob):
     """_summary_
 
     Args:
@@ -38,6 +43,10 @@ def evaluateCost(bins,c,prob):
     Returns:
         _type_: _description_
     """
+    cdef dict cost_map
+    cdef int min_b,num_station
+    cdef int b
+    cdef double ws,wbs,soc
     cost_map=dict()
     soc=0
     for s in range(num_station):
@@ -57,12 +66,18 @@ def evaluateCost(bins,c,prob):
     return soc,cost_map
 
 
-def greedy_allocating(prob):
+cdef greedy_allocating(list prob):
     """_summary_
 
     Returns:
         _type_: _description_
     """
+    cdef int row_ind,col_ind,b,max_cost,old_soc,min_soc
+    cdef list cost_bins,unallocated_bins
+    cdef dict allocation_map,bin_cost_map,type_bin,new_cost_map
+    cdef int ub,cbins
+    cdef list result
+
     row_ind, col_ind, cost_bins, soc = min_cost_matching(prob)
 
     allocation_map=dict()
@@ -107,13 +122,16 @@ def greedy_allocating(prob):
 
         break
     soc=soc-old_soc+min_soc
-
+    
     result=[allocation_map[b] for b in range(num_bins)]
     return result
 
-def hungarian(prob):
+cpdef hungarian(list prob):
+    cdef int row_ind,col_ind,b,max_cost,old_soc,min_soc,c
+    cdef list cost_bins,unallocated_bins
+    cdef dict allocation_map,bin_cost_map,type_bin
+    cdef list result
     row_ind, col_ind, cost_bins, soc = min_cost_matching(prob)
-    print(soc/num_station)
     allocation_map=dict()
     bin_cost_map=dict()
     type_bin=dict()
@@ -125,7 +143,6 @@ def hungarian(prob):
         type_bin[c].append(b)
     result=[allocation_map[b] for b in range(num_bins)]
     return result
-    
 
 
 if __name__=="__main__":

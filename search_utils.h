@@ -12,13 +12,25 @@
 
 #include <fstream>
 #include <iostream>
-
+#include <chrono>
 #include <boost/functional/hash.hpp>
 #include <boost/program_options.hpp>
 
 #include "custom_astar.h"
 #include "suo.h"
 #include "task.h"
+
+#include <libMultiRobotPlanning/a_star_epsilon.hpp>
+
+
+inline double time_elapsed_debug(
+    std::chrono::time_point<std::chrono::high_resolution_clock>& start_time) {
+    return double(static_cast<long long int>(
+               std::chrono::duration_cast<std::chrono::microseconds>(
+                   std::chrono::high_resolution_clock::now() - start_time)
+                   .count())) /
+           1000000;
+}
 
 /**
  * @brief The namespace for a robot model.
@@ -96,6 +108,7 @@ inline std::ostream& operator<<(std::ostream& os, const Action& a) {
  */
 class Environment {
    public:
+    using Paths=std::vector<std::vector<Node>>;
     Environment(const Graph& g_in) : g(g_in) {}
     Environment(const Graph& g_in, State goal_in)
         : g(g_in), m_goal(std::move(goal_in)) {}
@@ -115,6 +128,16 @@ class Environment {
                 return get_manhattan_distance(s.n, m_goal.n) +
                        suo->get_heuristic_value(s_prev.n, s.n, s.t);
         return get_manhattan_distance(s.n, m_goal.n);
+    }
+
+    double true_distance(const State &s){
+        Node start=s.n;
+        Node goal=m_goal.n;
+    }
+
+
+    double admissibleHeuristic(const State &s){
+        return get_manhattan_distance(s.n,m_goal.n); 
     }
 
     /**
@@ -195,6 +218,35 @@ class Environment {
 
     void onDiscover(const State& /*s*/, double /*fScore*/, double /*gScore*/) {}
 
+    Paths path_table;
+
+    int agent_id;
+
+
+    double focalStateHeuristic(const State &s, double gScore)
+    {
+        int num_conflicts=0;
+        for(int i=0;i<path_table.size();i++){
+            if(i==agent_id) continue;
+            int li=path_table[i].size();
+            if(s.t>=li) continue;
+            if(path_table[i][li-1-s.t]==s.n) num_conflicts++;
+        }
+        return num_conflicts;
+    }
+
+    double focalTransitionHeuristic(const State &s1, const State &s2,
+                                double gScoreS1, double gScoreS2)
+    {
+        int num_conflicts=0;
+        // for(int i=0;i<path_table.size();i++){
+        //     if(i==agent_id) continue;
+        //     if(s2.t>=path_table[i].size()) continue;
+        //     if(path_table[i][s2.t]==s1.n and path_table[i][s1.t]==s2.n) num_conflicts++;
+        // }
+        return num_conflicts;
+    }
+
     const Graph& g;
     State m_goal;  // Single A* goal
     SUO* suo = nullptr;
@@ -228,10 +280,12 @@ struct hash<OmniDirectionalRobot::State> {
 template <typename State, typename Action, typename Environment>
 class SingleRobotPathPlanner {
    public:
+   using Paths=std::vector<std::vector<Node>>;
     SingleRobotPathPlanner(const Graph& g) {
         env = new Environment(g);
         searcher = new libMultiRobotPlanning::AStar<State, Action, double,
                                                     Environment>(*env);
+        focal_searcher=new libMultiRobotPlanning::AStarEpsilon<State,Action,double,Environment>(*env,1.2);
     }
     ~SingleRobotPathPlanner() {
         delete env;
@@ -250,6 +304,19 @@ class SingleRobotPathPlanner {
     search(Node start, Node goal) {
         return search(State(start), State(goal));
     }
+
+
+    libMultiRobotPlanning::PlanResult<State, Action, double> search_focal(State start,State goal,int agent_id,Paths&path_table){
+        env->setGoal(goal);
+        env->agent_id=agent_id;
+        env->path_table=path_table;
+        libMultiRobotPlanning::PlanResult<State, Action, double> solution;
+        bool search_success=focal_searcher->search(start,solution);
+        return solution;
+
+    }
+
+    
 
     /**
      * @brief Search for a path given the start and goal state (appllies to any
@@ -285,7 +352,10 @@ class SingleRobotPathPlanner {
      * @return std::vector<Node>
      */
     inline std::vector<Node> reversed_search(Node start, Node goal) {
+        // auto start_time=std::chrono::high_resolution_clock::now();
         auto result = search(start, goal);
+        // double time_cost=time_elapsed_debug(start_time);
+        // std::cout<<"elpased "<<time_cost<<"   "<<start<<"   "<<goal<<std::endl;
         auto path = std::vector<Node>();
         path.reserve(result.states.size());
         for (int i = result.states.size() - 1; i >= 0; i--)
@@ -293,6 +363,18 @@ class SingleRobotPathPlanner {
         return path;
     }
 
+
+
+    inline std::vector<Node> reversed_search_focal(Node start, Node goal,int agent_id,Paths &path_table) {
+        auto result = search_focal(State(start), State(goal),agent_id,path_table);
+        auto path = std::vector<Node>();
+        path.reserve(result.states.size());
+        for (int i = result.states.size() - 1; i >= 0; i--)
+            path.push_back(result.states[i].first.n);
+        return path;
+    }
+
     libMultiRobotPlanning::AStar<State, Action, double, Environment>* searcher;
+    libMultiRobotPlanning::AStarEpsilon<State,Action,double,Environment> *focal_searcher;
     Environment* env;
 };

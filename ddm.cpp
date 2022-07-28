@@ -9,6 +9,7 @@
  *
  */
 #include "ddm.h"
+#include "a_star.hpp"
 
 std::vector<std::unordered_map<std::string, std::string>> ddm_database;
 
@@ -84,12 +85,15 @@ std::vector<std::vector<Node>> DdmSolver::solve(OneShotTask& task, Graph& g, int
                   return path_lengths[a] < path_lengths[b];
               });
     // First, get an independent path for each robot
-    auto path_planner =
-        SingleRobotPathPlanner<OmniDirectionalRobot::State,
-                               OmniDirectionalRobot::Action,
-                               OmniDirectionalRobot::Environment>(g);
-    path_planner.set_suo(*suo);
-    if (suo) suo->clear();
+    // auto path_planner =
+    //     SingleRobotPathPlanner<OmniDirectionalRobot::State,
+    //                            OmniDirectionalRobot::Action,
+    //                            OmniDirectionalRobot::Environment>(g);
+
+    auto path_planner=AStar(g);
+    
+    // path_planner.set_suo(*suo);
+    // if (suo) suo->clear();
     // TODO multiple SUO rounds
     for (size_t i = 0; i < task.num_robots; i++) {
         auto robot_index = robot_order[i];
@@ -557,7 +561,7 @@ std::vector<std::vector<Node>> DdmSolver::solve(OneShotTask& task, Graph& g, int
 
 std::vector<std::vector<Node>> DdmSolver::solve(MultiGoalTask& task, Graph& g,int horizon) {
     // TODO
-     assert(!ddm_database.empty());
+    assert(!ddm_database.empty());
     // Make sure the output is deterministic
     srand(0);
     // Generate all necessary data structures
@@ -593,18 +597,19 @@ std::vector<std::vector<Node>> DdmSolver::solve(MultiGoalTask& task, Graph& g,in
                   return path_lengths[a] < path_lengths[b];
               });
     // First, get an independent path for each robot
-    auto path_planner =
-        SingleRobotPathPlanner<OmniDirectionalRobot::State,
-                               OmniDirectionalRobot::Action,
-                               OmniDirectionalRobot::Environment>(g);
-    path_planner.set_suo(*suo);
-    if (suo) suo->clear();
+    // auto path_planner =
+    //     SingleRobotPathPlanner<OmniDirectionalRobot::State,
+    //                            OmniDirectionalRobot::Action,
+    //                            OmniDirectionalRobot::Environment>(g);
+    // path_planner.set_suo(*suo);
+    // if (suo) suo->clear();
+    auto path_planner=AStar(g);
     // TODO multiple SUO rounds
     for (size_t i = 0; i < task.num_robots; i++) {
         auto robot_index = robot_order[i];
         future_paths[robot_order[i]] = path_planner.reversed_search(
             task.starts[robot_order[i]], task.goals[robot_order[i]][0]);
-        if (suo) suo->add_path(future_paths[robot_order[i]], true);
+        // if (suo) suo->add_path(future_paths[robot_order[i]], true);
         future_paths[robot_order[i]].pop_back();
     }
     std::vector<size_t> goal_ids(task.num_robots,0);
@@ -638,9 +643,10 @@ std::vector<std::vector<Node>> DdmSolver::solve(MultiGoalTask& task, Graph& g,in
                         goal_ids[i]++;  //new goal assigned to robot i
                     auto start_i=paths.back()[i];
                     auto goal_i=task.goals[i][goal_ids[i]];
+                    
                     future_paths[i]=path_planner.reversed_search(start_i, goal_i);
-            
                     future_paths[i].pop_back();
+                    
                   
                 }
                 // //future_paths[i].push_back(paths.back()[i]);

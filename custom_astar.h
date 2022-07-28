@@ -22,6 +22,7 @@
 #include <libMultiRobotPlanning/neighbor.hpp>
 
 #include "task.h"
+#include<random>
 
 namespace libMultiRobotPlanning {
 
@@ -86,7 +87,7 @@ class AStar {
         solution.states.push_back(startState);
         solution.actions.clear();
         solution.cost = 0;
-
+        int num_expansions=0;
         openSet_t openSet;
         std::unordered_map<State, fibHeapHandle_t, StateHasher> stateToHeap;
         std::unordered_set<State, StateHasher> closedSet;
@@ -104,12 +105,14 @@ class AStar {
         neighbors.reserve(5);
 
         while (!openSet.empty()) {
+            num_expansions++;
             Node current = openSet.top();
             m_env.onExpandNode(current.state, current.fScore, current.gScore);
 
             if (m_env.isSolution(current.state)) {
                 solution.states.clear();
                 solution.actions.clear();
+                // std::cout<<"success   "<<num_expansions<<std::endl;
                 auto iter = cameFrom.find(current.state);
                 while (iter != cameFrom.end()) {
                     solution.states.push_back(iter->first);
@@ -130,6 +133,9 @@ class AStar {
             // traverse neighbors
             neighbors.clear();
             m_env.getNeighbors(current.state, neighbors);
+            // std::cout<<"NO random"<<std::endl;
+            // auto rng = std::default_random_engine {};
+            // std::shuffle(std::begin(neighbors), std::end(neighbors), rng);        
             for (const Neighbor<State, Action, Cost>& neighbor : neighbors) {
                 if (closedSet.find(neighbor.state) == closedSet.end()) {
                     Cost tentative_gScore = current.gScore + neighbor.cost;

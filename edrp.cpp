@@ -1,16 +1,9 @@
-#include"drp.h"
+#include"edrp.h"
 #include "a_star.hpp"
 
-void DRP::debugger(int index){
-    if(index==88){
-        std::cout<<"Debugging"<<future_paths[index].size()<<std::endl;
-        if(future_paths[index].size()>=800) assert(false);
-    }
-
-}
 
 
-std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int horizon){
+std::vector<std::vector<Node>> EDRP::solve(MultiGoalTask& task, Graph& g,int horizon){
     // std::cout<<"MAPF horizon="<<horizon<<std::endl;
     srand(0);
     auto paths =
@@ -40,22 +33,21 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
                   return path_lengths[a] < path_lengths[b];
               });
     // First, get an independent path for each robot
-    // auto path_planner =
-    //     SingleRobotPathPlanner<OmniDirectionalRobot::State,
-    //                            OmniDirectionalRobot::Action,
-    //                            OmniDirectionalRobot::Environment>(g);
-    auto path_planner=AStar(g);
+    auto path_planner =
+        SingleRobotPathPlanner<OmniDirectionalRobot::State,
+                               OmniDirectionalRobot::Action,
+                               OmniDirectionalRobot::Environment>(g);
+    // auto path_planner=AStarEps(g);
     std::vector<size_t> goal_ids(task.num_robots,0);
 
 
     for (size_t i = 0; i < task.num_robots; i++) {
         auto robot_index = robot_order[i];
-        future_paths[robot_order[i]] = path_planner.reversed_search(
-            task.starts[robot_order[i]], task.goals[robot_order[i]][0]);
-        
+        // future_paths[robot_order[i]] = path_planner.reversed_search(
+        //     task.starts[robot_order[i]], task.goals[robot_order[i]][0]);
+        future_paths[robot_order[i]]=path_planner.reversed_search_focal( task.starts[robot_order[i]], task.goals[robot_order[i]][0],i,future_paths);
         // if (suo) suo->add_path(future_paths[robot_order[i]], true);
         future_paths[robot_order[i]].pop_back();
-       
         // std::cout<<future_paths[robot_order[i]].size()<<std::endl;
     }
     
@@ -67,11 +59,10 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
 
 
     while (true) {
-        
         // Check if robots are already at the goals. If goals reached,
         // return the solution; if max horizon reached, return solution.
         bool future_paths_all_empty = true;
-
+ 
 
         for (size_t i = 0; i < task.num_robots; i++){
             // if(future_paths[i].back()==Node(-1,-1))future_paths[i].pop_back();
@@ -83,29 +74,26 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
         
         if (future_paths_all_empty || paths.size() > horizon) {//found the solutions
             task.target_goal_reaching_num=0;
-            
             for(size_t i=0;i<goal_ids.size();i++){
                 task.target_goal_reaching_num+=goal_ids[i];
+                // std::cout<<"robot "<<i<<" completed "<<goal_ids[i]<<" tasks"<<std::endl;
+
             }
             task.finished_goals=goal_ids;
-           
             // check_multi_goal_path_feasibility(paths,task,g);
             // save_paths_as_txt("./text.txt",paths);
             // std::cout<<future_paths_all_empty<<"   "<<paths.size()<<"   "<<horizon<<"  "<<goal_ids[0]<<"   "<<task.goals[0].size()<<std::endl;
             return paths;
         }
-        
+
         for (size_t i = 0; i < task.num_robots; i++){
-            
             // std::cout<<"debug "<<future_paths[i].size()<<"  current goal id="<<goal_ids[i]<<" task number="<<task.goals[i].size()<<std::endl;
             if (future_paths[i].empty())
             {
                 // std::cout<<"empty "<<std::endl;
-
                 if (goal_ids[i] >= task.goals[i].size())
                 {
                     future_paths[i].push_back(Node(-1,-1)); // all the goals are finished,remove this robot
-                    
                     
                 }
                 else
@@ -114,7 +102,6 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
                         // std::cout<<"Next goal"<<std::endl;
                         goal_ids[i]++; // new goal assigned to robot i
                     }
-                   
                     if(goal_ids[i]>=task.goals[i].size()){
                         future_paths[i].push_back(Node(-1,-1));
                         continue;
@@ -122,14 +109,14 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
                     // std::cout<<"robot "<<i<<" is planning task "<<goal_ids[i]<<std::endl;
                     auto start_i = paths.back()[i];
                     auto goal_i = task.goals[i][goal_ids[i]];
-                    // auto start_time = std::chrono::high_resolution_clock::now();
                     // std::cout<<"searching for "<<i<<" "<<start_i<<" to  "<<goal_i<<"  "<<goal_ids[i]<<"  "<<task.goals[i].size()<<std::endl;
-                    future_paths[i] = path_planner.reversed_search(start_i, goal_i);
-                    // double time_cost=time_elapsed(start_time);
-                    // std::cout<<"elpased "<<time_cost<<std::endl;
+                    // future_paths[i] = path_planner.reversed_search(start_i, goal_i);
+                
+                    future_paths[i] = path_planner.reversed_search_focal(start_i, goal_i,i,future_paths);
                     // std::cout<<" successfully done "<<std::endl;
-
+                   
                     future_paths[i].pop_back();
+                   
                 }
      
                 // if (suo)
@@ -137,7 +124,7 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
             }
         }
 
-        
+        // auto next_step = std::vector<Node>(task.num_robots);
         next_step.clear();
         current_positions.clear();
         moved_robots.clear();
@@ -163,7 +150,7 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
         //     std::cout<<v<<"  "<<id<<std::endl;
         // }
         // exit(0);
-        
+   
         recStack.clear();
         cycling.clear();
         paths.push_back(paths.back());
@@ -179,30 +166,29 @@ std::vector<std::vector<Node>> DRP::solve(MultiGoalTask& task, Graph& g,int hori
         //     // exit(0);
         // }
         // }
-        
+
         for(int i=0;i<task.num_robots;i++){
             // if(i==88 ) std::cout<<" robot "<<i<<" current step ="<<paths.back()[i]<<" next step "<<next_step[i]<<"  future paths[i].size()="<<future_paths[i].size()<<"  goal_id= "<<goal_ids[i]<<std::endl;
    
             recStack.clear();
             move(i,paths);
         }
-       
     }
        
 }
 
-void DRP::move_all_robots_in_cycle(int robot,Paths&paths){
+void EDRP::move_all_robots_in_cycle(int robot,Paths&paths){
     std::set<int> visited;
     auto curr=robot;
     // std::cout<<"Move along a cycle"<<std::endl;
     bool debbuged=false;
-    // if(paths.size()==2) debbuged=true;
+    if(paths.size()==2) debbuged=true;
     while(true){
   
         if(visited.find(curr)!=visited.end()) break;
         visited.insert(curr);
         auto v=future_paths[curr].back();
-        // if(debbuged)std::cout<<"oh cycled "<<curr<<" " <<v <<std::endl;
+        if(debbuged)std::cout<<"oh cycled "<<curr<<" " <<v <<std::endl;
         moveRobot(curr,paths);
         cycling[curr]=true;
         curr=current_positions[v];
@@ -211,33 +197,26 @@ void DRP::move_all_robots_in_cycle(int robot,Paths&paths){
 }
 
 
-int DRP::get_conflicted_robot(int r,Paths &paths){
+int EDRP::get_conflicted_robot(int r,Paths &paths){
     auto ur=paths.back()[r];
     auto vr=future_paths[r].back();
-
     for(int x=ur.x-1;x<=ur.x+1;x++){
         for(int y=ur.y-1;y<=ur.y+1;y++){
             Node nb=Node(x,y);
             if(nb==ur) continue;
             if(current_positions.find(nb)==current_positions.end()) continue;
             auto rk=current_positions[nb];
-            if(moved_robots.find(rk)!=moved_robots.end() and paths.back()[rk]==vr){
-                // std::cout<<"conflicting"<<std::endl;
-                return rk;
-            }
+            if(moved_robots.find(rk)!=moved_robots.end() and paths.back()[rk]==vr)return rk;
             auto vk=future_paths[rk].back();
-            if(vk==vr){
-                // std::cout<<"Conflicting "<<std::endl;
-                return rk;
-            } 
+            if(vk==vr) return rk;
 
         }
     }
     return -1;
 }
 
-std::pair<bool,bool> DRP::move(int robot,Paths& paths){
-     bool debugged=false;
+std::pair<bool,bool> EDRP::move(int robot,Paths& paths){
+    bool debugged=false;
     if(paths.size()==2) debugged=true;
     if(robot<0) return {true,true};
     auto next_v=next_step[robot];
@@ -253,7 +232,6 @@ std::pair<bool,bool> DRP::move(int robot,Paths& paths){
         //     std::cout<<"find cycles "<<robot<<std::endl;
         //     exit(0);
         // }
-   
         move_all_robots_in_cycle(robot,paths);
         return {true,true};
     }
@@ -266,7 +244,6 @@ std::pair<bool,bool> DRP::move(int robot,Paths& paths){
     if(moved_robots.find(robot)!=moved_robots.end()){
         if(debugged and robot==12){
             std::cout<<"moved in this cycle  "<<paths.back()[12]<<std::endl;
-          
         }
         return {moved_robots[robot],cycling[robot]};
     }
@@ -275,10 +252,9 @@ std::pair<bool,bool> DRP::move(int robot,Paths& paths){
         delayRobot(robot,paths);
         return {false,false};
     }
-       
-    
-  
     int rk=get_conflicted_robot(robot,paths);
+
+    if(rk==12 and debugged==true) std::cout<<"conflicted "<<rk<<"  "<<robot<<std::endl;
 
     if(rk==-1){
         moveRobot(robot,paths);
@@ -301,20 +277,20 @@ std::pair<bool,bool> DRP::move(int robot,Paths& paths){
     
 }
 
-void DRP::moveRobot(int i,Paths &paths){
+void EDRP::moveRobot(int i,Paths &paths){
     moved_robots[i]=true;
     assert(future_paths[i].empty()==false);
     paths.back()[i]=future_paths[i].back();
     future_paths[i].pop_back();
 }
 
-void DRP::delayRobot(int i, Paths &paths){
+void EDRP::delayRobot(int i, Paths &paths){
     moved_robots[i]=false;
     paths.back()[i]=paths.back()[i];
 }
 
 
-bool DRP::check_cycles(const std::vector<Node> &next_pos){
+bool EDRP::check_cycles(const std::vector<Node> &next_pos){
     int num_robots=next_pos.size();
 
     moved_robots.clear();  
@@ -328,7 +304,7 @@ bool DRP::check_cycles(const std::vector<Node> &next_pos){
 }
 
 
-bool DRP::isCyclicUtil(int robot_id,const std::vector<Node> &next_pos){
+bool EDRP::isCyclicUtil(int robot_id,const std::vector<Node> &next_pos){
     moved_robots.insert({robot_id,true});
     recStack.insert(robot_id);
     auto next_v=next_pos[robot_id];

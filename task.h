@@ -346,7 +346,7 @@ inline Graph get_warehouse_graph(int num_shelf_x, int num_shelf_y,
  * @param ymax 
  * @return Graph 
  */
-inline Graph get_sorting_warehouse(int xmax=27,int ymax=12){
+inline Graph get_sorting_warehouse(int xmax=29,int ymax=14){
     Graph g=Graph();
     // sorting center warehouse directed graph
     assert(xmax > 0 && ymax > 0);
@@ -365,27 +365,27 @@ inline Graph get_sorting_warehouse(int xmax=27,int ymax=12){
             g.nodes.push_back(n);
             // Find all neighbors
             auto neighbors = std::vector<Node>();
-            if(j %3==0 and i<xmax-1) neighbors.push_back(Node(i+1,j));
+            if(j %3==0 and i<xmax) neighbors.push_back(Node(i+1,j));
             if(j %3==1 and i>0) neighbors.push_back(Node(i-1,j));
             if(i %3==0 and j>0) neighbors.push_back(Node(i,j-1));
-            if(i %3==1 and j <ymax-1) neighbors.push_back(Node(i,j+1));
+            if(i %3==1 and j <ymax) neighbors.push_back(Node(i,j+1));
             g.adj_list.insert(std::make_pair(n, neighbors));
         }
     }
     auto obstacles = std::vector<Node>();
-    for (size_t i= 1; i<xmax; i+=3)
-        for (size_t j=1; j < ymax; j+=3) {
+    for (size_t i= 2; i<xmax; i+=3)
+        for (size_t j=2; j < ymax; j+=3) {
             obstacles.push_back(Node(i, j));
         }
     for (auto n : obstacles) g.remove_node(n);
 
     //debug
-    for(auto v:g.nodes){
-        std::cout<<v<<"  :  (";
-        for(auto u: g.adj_list[v])
-            std::cout<<u<<"  ";
-        std::cout<<")"<<std::endl;
-    }
+    // for(auto v:g.nodes){
+    //     std::cout<<v<<"  :  (";
+    //     for(auto u: g.adj_list[v])
+    //         std::cout<<u<<"  ";
+    //     std::cout<<")"<<std::endl;
+    // }
    
     return g;
     //
@@ -528,6 +528,8 @@ inline bool check_one_shot_path_feasibility(
  */
 struct MultiGoalTask : public PathPlanningTask {
     std::vector<std::vector<Node>> goals;
+    std::vector<std::vector<int>>types;
+    std::vector<size_t>finished_goals;
     int target_goal_reaching_num;
 };
 
@@ -548,7 +550,7 @@ inline MultiGoalTask get_multi_goal_task(int num_robots,
     t.g = &g;
     t.num_robots = num_robots;
     t.seed = seed;
-    srand(seed);
+    srand(time(0));
     t.starts = get_random_nodes(g, num_robots, false, rand());
     t.goals = std::vector<std::vector<Node>>();
     t.target_goal_reaching_num = target_goal_reaching_num;
